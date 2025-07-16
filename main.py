@@ -1,8 +1,9 @@
-from flask import Flask, jsonify, request
+from flask import Flask, render_template, request, jsonify
 from dotenv import load_dotenv
 import os
 import requests
 import json
+from datetime import datetime
 
 # Load environment variables from .env
 load_dotenv()
@@ -10,25 +11,79 @@ load_dotenv()
 
 def create_app():
     app = Flask(__name__)
+    app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-here')
 
-    # Root route
+    # Store conversation history (in production, use a database)
+    conversation_history = []
+
+    # Home route - render the chatbot interface
     @app.route('/')
     def home():
-        return "API working ✅"
+        return render_template('index.html')
 
-    # Test GlobalGiving API connection
-    @app.route('/test-globalgiving')
+    # API endpoint to handle chat messages
+    @app.route('/api/chat', methods=['POST'])
+    def chat():
+        try:
+            data = request.json
+            user_message = data.get('message', '')
+            selected_model = data.get('model', 'gpt-3.5-turbo')
+
+            if not user_message:
+                return jsonify({'error': 'No message provided'}), 400
+
+            # Add user message to history
+            conversation_history.append({
+                'type': 'user',
+                'message': user_message,
+                'timestamp': datetime.now().isoformat()
+            })
+
+            # Mock response for now (replace with actual GlobalGiving + OpenAI integration)
+            if selected_model == 'gpt-3.5-turbo':
+                bot_response = f"🤖 GPT-3.5 Response: I found several charities related to '{user_message}'. Here are my recommendations based on impact and transparency."
+            else:
+                bot_response = f"🧠 GPT-4 Response: After analyzing '{user_message}', I recommend these high-impact organizations with detailed reasoning."
+
+            # Add bot response to history
+            conversation_history.append({
+                'type': 'bot',
+                'message': bot_response,
+                'model': selected_model,
+                'timestamp': datetime.now().isoformat()
+            })
+
+            return jsonify({
+                'response': bot_response,
+                'model': selected_model,
+                'timestamp': datetime.now().isoformat()
+            })
+
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    # API endpoint to get conversation history
+    @app.route('/api/history', methods=['GET'])
+    def get_history():
+        return jsonify({'history': conversation_history})
+
+    # API endpoint to clear conversation history
+    @app.route('/api/clear', methods=['POST'])
+    def clear_history():
+        conversation_history.clear()
+        return jsonify({'message': 'History cleared'})
+
+    # Test GlobalGiving API (from previous code)
+    @app.route('/api/test-globalgiving')
     def test_globalgiving():
         """Test if GlobalGiving API is working"""
         try:
-            # GlobalGiving public search endpoint
             base_url = "https://api.globalgiving.org/api/public/services/search/project/summary"
 
-            # Test with a simple query
             params = {
-                'q': 'education',  # Search for education projects
-                'start': 0,  # Start from first result
-                'nexus': 'json'  # Request JSON format
+                'q': 'education',
+                'start': 0,
+                'nexus': 'json'
             }
 
             headers = {
@@ -40,145 +95,10 @@ def create_app():
 
             if response.status_code == 200:
                 data = response.json()
-
-                # Extract key info from response
-                result = {
+                return jsonify({
                     'status': 'success',
                     'total_projects': data.get('search', {}).get('numberFound', 0),
-                    'projects_returned': len(data.get('search', {}).get('projects', {}).get('project', [])),
-                    'sample_project': None
-                }
-
-                # Get first project as sample
-                projects = data.get('search', {}).get('projects', {}).get('project', [])
-                if projects:
-                    first_project = projects[0]
-                    result['sample_project'] = {
-                        'id': first_project.get('id'),
-                        'title': first_project.get('title'),
-                        'summary': first_project.get('summary', '')[:200] + '...',
-                        'country': first_project.get('country'),
-                        'theme': first_project.get('theme'),
-                        'url': first_project.get('projectLink')
-                    }
-
-                return jsonify(result)
-            else:
-                return jsonify({
-                    'status': 'error',
-                    'message': f'API returned status code: {response.status_code}',
-                    'response': response.text
-                }), response.status_code
-
-        except requests.exceptions.RequestException as e:
-            return jsonify({
-                'status': 'error',
-                'message': f'Request failed: {str(e)}'
-            }), 500
-        except Exception as e:
-            return jsonify({
-                'status': 'error',
-                'message': f'Unexpected error: {str(e)}'
-            }), 500
-
-    # Test different search queries
-    @app.route('/search/<topic>')
-    def search_by_topic(topic):
-        """Search GlobalGiving by topic"""
-        try:
-            base_url = "https://api.globalgiving.org/api/public/services/search/project/summary"
-
-            params = {
-                'q': topic,
-                'start': 0,
-                'nexus': 'json'
-            }
-
-            headers = {
-                'Accept': 'application/json',
-                'User-Agent': 'AltrueBot/1.0'
-            }
-
-            response = requests.get(base_url, params=params, headers=headers, timeout=10)
-
-            if response.status_code == 200:
-                data = response.json()
-                projects = data.get('search', {}).get('projects', {}).get('project', [])
-
-                # Format projects for easy reading
-                formatted_projects = []
-                for project in projects[:5]:  # Limit to first 5
-                    formatted_projects.append({
-                        'id': project.get('id'),
-                        'title': project.get('title'),
-                        'country': project.get('country'),
-                        'theme': project.get('theme'),
-                        'summary': project.get('summary', '')[:150] + '...' if len(
-                            project.get('summary', '')) > 150 else project.get('summary', ''),
-                        'url': project.get('projectLink')
-                    })
-
-                return jsonify({
-                    'status': 'success',
-                    'topic': topic,
-                    'total_found': data.get('search', {}).get('numberFound', 0),
-                    'projects': formatted_projects
-                })
-            else:
-                return jsonify({
-                    'status': 'error',
-                    'message': f'API returned status code: {response.status_code}'
-                }), response.status_code
-
-        except Exception as e:
-            return jsonify({
-                'status': 'error',
-                'message': f'Error: {str(e)}'
-            }), 500
-
-    # Test with country filter
-    @app.route('/search/<topic>/<country>')
-    def search_by_topic_and_country(topic, country):
-        """Search GlobalGiving by topic and country"""
-        try:
-            base_url = "https://api.globalgiving.org/api/public/services/search/project/summary"
-
-            params = {
-                'q': topic,
-                'country': country,
-                'start': 0,
-                'nexus': 'json'
-            }
-
-            headers = {
-                'Accept': 'application/json',
-                'User-Agent': 'AltrueBot/1.0'
-            }
-
-            response = requests.get(base_url, params=params, headers=headers, timeout=10)
-
-            if response.status_code == 200:
-                data = response.json()
-                projects = data.get('search', {}).get('projects', {}).get('project', [])
-
-                # Format projects
-                formatted_projects = []
-                for project in projects[:3]:  # Limit to first 3
-                    formatted_projects.append({
-                        'id': project.get('id'),
-                        'title': project.get('title'),
-                        'country': project.get('country'),
-                        'theme': project.get('theme'),
-                        'summary': project.get('summary', '')[:200] + '...' if len(
-                            project.get('summary', '')) > 200 else project.get('summary', ''),
-                        'url': project.get('projectLink')
-                    })
-
-                return jsonify({
-                    'status': 'success',
-                    'search_params': f"{topic} in {country}",
-                    'total_found': data.get('search', {}).get('numberFound', 0),
-                    'projects': formatted_projects
+                    'sample_data': data
                 })
             else:
                 return jsonify({
@@ -197,10 +117,6 @@ def create_app():
 
 if __name__ == '__main__':
     app = create_app()
-    print("🚀 Starting Flask app...")
-    print("📍 Test URLs:")
-    print("   - Basic test: http://127.0.0.1:5000/")
-    print("   - GlobalGiving test: http://127.0.0.1:5000/test-globalgiving")
-    print("   - Search by topic: http://127.0.0.1:5000/search/education")
-    print("   - Search by topic+country: http://127.0.0.1:5000/search/education/kenya")
+    print("🚀 Starting Altrue Chatbot...")
+    print("📍 Open your browser to: http://127.0.0.1:5000/")
     app.run(debug=True)
