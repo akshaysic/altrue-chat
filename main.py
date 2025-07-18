@@ -5,6 +5,7 @@ import requests
 import json
 from datetime import datetime
 
+
 # Load environment variables from .env
 load_dotenv()
 
@@ -12,9 +13,6 @@ load_dotenv()
 def create_app():
     app = Flask(__name__)
     app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-here')
-
-    # Store conversation history (in production, use a database)
-    conversation_history = []
 
     # Home route - render the chatbot interface
     @app.route('/')
@@ -28,35 +26,47 @@ def create_app():
             data = request.json
             user_message = data.get('message', '')
             selected_model = data.get('model', 'gpt-3.5-turbo')
+            prompt_type = data.get('prompt_type', 'direct')  # support prompt variation
 
             if not user_message:
                 return jsonify({'error': 'No message provided'}), 400
 
-            # Add user message to history
-            conversation_history.append({
-                'type': 'user',
-                'message': user_message,
-                'timestamp': datetime.now().isoformat()
-            })
+            # Connect to DB
+            conn = connect("data/altrue.db")
+            cursor = conn.cursor()
 
-            # Mock response for now (replace with actual GlobalGiving + OpenAI integration)
-            if selected_model == 'gpt-3.5-turbo':
-                bot_response = f"🤖 GPT-3.5 Response: I found several charities related to '{user_message}'. Here are my recommendations based on impact and transparency."
-            else:
-                bot_response = f"🧠 GPT-4 Response: After analyzing '{user_message}', I recommend these high-impact organizations with detailed reasoning."
+            # Save query to DB
+            cursor.execute('''
+                INSERT INTO queries (user_query)
+                VALUES (?)
+            ''', (user_message,))
+            query_id = cursor.lastrowid
 
-            # Add bot response to history
-            conversation_history.append({
-                'type': 'bot',
-                'message': bot_response,
-                'model': selected_model,
-                'timestamp': datetime.now().isoformat()
-            })
+            # Simulate LLM structured response (to replace with OpenAI later)
+            structured_output = {
+                "cause_area": "education",
+                "region": "East Africa",
+                "recommended_charities": [
+                    {"name": "Books for Africa", "impact_summary": "Provides textbooks and learning materials."},
+                    {"name": "Educate!", "impact_summary": "Delivers skills-based education in Uganda."}
+                ]
+            }
+
+            # Store response in DB
+            cursor.execute('''
+                INSERT INTO responses (query_id, model_used, projects_json, prompt_type)
+                VALUES (?, ?, ?, ?)
+            ''', (query_id, selected_model, json.dumps(structured_output), prompt_type))
+
+            conn.commit()
+            conn.close()
 
             return jsonify({
-                'response': bot_response,
-                'model': selected_model,
-                'timestamp': datetime.now().isoformat()
+                "response": structured_output,
+                "query_id": query_id,
+                "model": selected_model,
+                "prompt_type": prompt_type,
+                "timestamp": datetime.now().isoformat()
             })
 
         except Exception as e:
@@ -117,6 +127,6 @@ def create_app():
 
 if __name__ == '__main__':
     app = create_app()
-    print("🚀 Starting Altrue Chatbot...")
-    print("📍 Open your browser to: http://127.0.0.1:5000/")
+    print("Starting Altrue Chatbot...")
+    print("Open your browser to: http://127.0.0.1:5000/")
     app.run(debug=True)

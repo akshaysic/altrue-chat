@@ -1,10 +1,6 @@
 import sqlite3
 
-"""GlobalGiving Project API
-Read the API Docs
-API Key Version 1 Active
-4b5fb6dd-91e3-44ae-8202-36cf16fdaf24"""
-
+"""GlobalGiving Project API"""
 
 
 # Connect to SQLite database (will create it if it doesn't exist)
