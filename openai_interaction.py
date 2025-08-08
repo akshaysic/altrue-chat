@@ -52,6 +52,8 @@ If the user is vague, ask clarifying questions to help narrow down the best caus
             {"role": "user", "content": user_message}
         ]
 
+#Append a variable with json file of projects/location/data from global giving and pass it into the instructions string to openAI
+
         response = client.responses.create(
             model="gpt-4o-mini",
             instructions = "You are an expert in global charities, nonprofit evaluation, and effective giving. Your role is to help users find high-impact, trustworthy organizations to support based on their interests. Always respond helpfully and clearly. You can recommend 2–3 organizations and briefly explain why they’re a good fit. Reference known cause areas, impact metrics (like DALYs averted, cost-effectiveness, transparency), and regions where helpful. If the user is vague, ask clarifying questions to help narrow down the best cause or region.",

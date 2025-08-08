@@ -8,26 +8,16 @@ from openai import OpenAI
 from fetch_data import search_projects, get_project_details
 import sqlite3
 import logging
-from flask_cors import CORS  # Optional if you're running frontend separately
+from flask_cors import CORS
 
 # Load environment variables
 load_dotenv()
 
+# Init OpenAI client
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 # Init conversation history
 conversation_history = []
-
-#init openai client
-client = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY"),
-)
-
-response = client.responses.create(
-    model="gpt-4o-mini",
-    instructions="You are an expert in global charities, nonprofit evaluation, and effective giving.",
-    input="How do I check if a charity is effective?",
-)
-
-print(response.output_text)
 
 
 def connect_db():
@@ -45,9 +35,6 @@ def parse_intent(message):
 
 
 def generate_response(user_message):
-    """
-    Parse user message, fetch relevant charity data, and generate a GPT response.
-    """
     intent = parse_intent(user_message)
     projects = search_projects(intent.get("theme") or intent.get("keyword"))
     detailed_projects = [get_project_details(p["id"]) for p in projects]
@@ -62,9 +49,13 @@ def generate_response(user_message):
         {"role": "user", "content": f"{user_message}\n\nRelevant projects:\n{project_text}"}
     ]
 
-    response = openai.response.create(model="gpt-4o", messages=messages)
-    return response.choices[0].message["content"], intent
+    # ✅ Correct way to call the API
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=messages
+    )
 
+    return response.choices[0].message.content, intent
 
 def create_app():
     app = Flask(__name__)

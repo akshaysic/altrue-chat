@@ -85,7 +85,9 @@
 
         const data = await response.json();
         if (response.ok) {
-          addMessage('bot', data.response, data.model);
+          // Extract and show only the response text
+          const reply = data.response.llm_response || '[No response]';
+          addMessage('bot', reply, data.model);
         } else {
           addMessage('bot', `Error: ${data.error}`, 'error');
         }
