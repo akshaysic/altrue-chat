@@ -24,8 +24,8 @@ The chatbot is part of the **Altrue** initiative — a social micro-donation sub
 
 ### 1) Clone & install
 ```bash
-git clone https://github.com/<your-username>/<your-repo>.git
-cd <your-repo>
+git clone https://github.com/akshaysic/altrue-chat.git
+cd altrue-chat
 
 # Python env (recommended)
 python -m venv .venv
